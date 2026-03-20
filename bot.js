@@ -20,7 +20,7 @@ async function main() {
     
     api.stream.trades.watch({ accounts: [account.id] }, (data) => {
         console.log('\n=== ПОЛУЧЕНЫ ДАННЫЕ ===');
-        console.log(JSON.stringify(data, null, 2));
+        console.log('Ключи:', Object.keys(data));
         
         if (data.orderTrades) {
             const order = data.orderTrades;
