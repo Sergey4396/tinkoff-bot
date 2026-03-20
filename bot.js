@@ -44,7 +44,7 @@ async function main() {
                         // После ПОКУПКИ -> ставим ПРОДАЖУ дороже (цена + дельта)
                         // После ПРОДАЖИ -> ставим ПОКУПКУ дешевле (цена - дельта)
                         const isBuy = order.direction === 1; // 1 = BUY
-                        const counterPrice = Math.round((isBuy ? price + PRICE_DELTA : price - PRICE_DELTA) * 1000) / 1000;
+                        const counterPrice = isBuy ? price + PRICE_DELTA : price - PRICE_DELTA;
                         const counterDirection = isBuy ? 2 : 1; // 2 = SELL, 1 = BUY
                         
                         console.log('  => Выставляю ордер на', isBuy ? 'ПРОДАЖУ' : 'ПОКУПКУ', 'по цене', counterPrice);
@@ -54,7 +54,7 @@ async function main() {
                                 accountId: accountId,
                                 figi: FIGI,
                                 quantity: Number(trade.quantity),
-                                price: { units: Math.floor(counterPrice), nano: Math.round((counterPrice % 1) * 1000000000) },
+                                price: api.helpers.toQuotation(counterPrice),
                                 direction: counterDirection,
                                 orderType: 1,
                                 orderId: `bot_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
