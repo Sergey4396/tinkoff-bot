@@ -14,6 +14,8 @@ const api = new TinkoffInvestApi({ token: TOKEN });
 let accountId = null;
 let reconnectDelay = 1000;
 let isRunning = true;
+let reconnectTimeout = null;
+let isReconnecting = false;
 
 async function processTrade(order, figi) {
     const priceDelta = INSTRUMENTS[figi];
@@ -50,6 +52,20 @@ async function processTrade(order, figi) {
     }
 }
 
+function scheduleReconnect() {
+    if (!isRunning || isReconnecting) return;
+    
+    isReconnecting = true;
+    console.log(`Переподключение через ${reconnectDelay}ms...`);
+    
+    reconnectTimeout = setTimeout(() => {
+        isReconnecting = false;
+        connectStream();
+    }, reconnectDelay);
+    
+    reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+}
+
 async function connectStream() {
     if (!isRunning) return;
     
@@ -74,20 +90,12 @@ async function connectStream() {
                 console.log('Поток прерван:', err.message);
             }
             
-            // Переподключение
-            if (isRunning) {
-                console.log(`Переподключение через ${reconnectDelay}ms...`);
-                setTimeout(connectStream, reconnectDelay);
-                reconnectDelay = Math.min(reconnectDelay * 2, 30000);
-            }
+            scheduleReconnect();
         })();
         
     } catch (err) {
         console.log('Ошибка подключения:', err.message);
-        if (isRunning) {
-            setTimeout(connectStream, reconnectDelay);
-            reconnectDelay = Math.min(reconnectDelay * 2, 30000);
-        }
+        scheduleReconnect();
     }
 }
 
@@ -110,6 +118,7 @@ async function main() {
 process.on('SIGINT', () => {
     console.log('\nВыключение...');
     isRunning = false;
+    if (reconnectTimeout) clearTimeout(reconnectTimeout);
     process.exit();
 });
 
