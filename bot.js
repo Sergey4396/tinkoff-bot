@@ -5,9 +5,9 @@ const TOKEN = 't.KNbRWnr_MoKUOuBfzvjyUTUYftgAdZhpZ4zBqfwkgYtd4wnOaYuHCJHAeRXounc
 // Конфигурация инструментов: FIGI -> дельта цены
 const INSTRUMENTS = {
     'FUTNGM032600': 0.010,  // NRH6
-    'FUTNG0326000': 0.025,   // NGH6
-    'FUTNG0426000': 0.010,  // NGJ6
-    'FUTNGM042600': 0.010,  // NRJ6
+    'FUTNG0326000': 0.030,   // NGH6
+    'FUTNG0426000': 0.030,  // NGJ6
+    'FUTNGM042600': 0.030,  // NRJ6
 };
 
 const api = new TinkoffInvestApi({ token: TOKEN });
