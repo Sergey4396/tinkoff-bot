@@ -23,8 +23,14 @@ async function main() {
             const order = data.orderTrades;
             console.log('\n=== НОВАЯ СДЕЛКА ===');
             console.log('FIGI:', order.figi);
-            console.log('Направление:', order.direction === OrderDirection.ORDER_DIRECTION_BUY ? 'ПОКУПКА' : 'ПРОДАЖА');
-            console.log('Кол-во сделок:', order.trades.length);
+            console.log('Наш FIGI:', FIGI);
+            console.log('Совпадение:', order.figi === FIGI ? 'ДА' : 'НЕТ');
+            
+            // Фильтруем только по нужному FIGI
+            if (order.figi !== FIGI) {
+                console.log('Пропускаем - не наш FIGI');
+                return;
+            }
             
             for (const trade of order.trades) {
                 const price = api.helpers.toNumber(trade.price);
@@ -50,6 +56,9 @@ async function main() {
                 }).catch(e => {
                     console.log('  Ошибка ордера:', e.message);
                 });
+            }
+        }
+    });
             }
         }
     });
