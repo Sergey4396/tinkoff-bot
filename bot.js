@@ -1,4 +1,5 @@
-import { TinkoffInvestApi } from 'tinkoff-invest-api';
+import { TinkoffInvestApi, RealAccount } from 'tinkoff-invest-api';
+import { OrderDirection, OrderType } from 'tinkoff-invest-api/dist/generated/orders.js';
 
 const TOKEN = 't.KNbRWnr_MoKUOuBfzvjyUTUYftgAdZhpZ4zBqfwkgYtd4wnOaYuHCJHAeRXounciZ3N4NSQGPtH-8v5Mw0f_fQ';
 const FIGI = 'FUTNGM032600';
@@ -9,48 +10,43 @@ const api = new TinkoffInvestApi({ token: TOKEN });
 async function main() {
     console.log('Подключение к Tinkoff API...');
     
-    const accounts = await api.investAPI.usersService.GetAccounts({});
-    const account = accounts.accounts[0];
+    const { accounts } = await api.users.getAccounts({});
+    const account = accounts[0];
     console.log('Аккаунт:', account.name, account.id);
     
-    const instrument = await api.investAPI.instrumentsService.GetInstrumentBy({
-        idType: 1,
-        id: FIGI
-    });
-    console.log('Инструмент:', instrument.name);
+    const tinkoffAccount = new RealAccount(api, account.id);
     
-    console.log('Подключение к потоку сделок...');
+    console.log('Подключение к потоку...');
     
-    const stream = api.investAPI.ordersStream.OrdersStream({
-        accounts: [account.id]
-    });
+    const stream = api.users.getUserOrdersStream({ accounts: [account.id] });
     
-    stream.on('data', async (data) => {
+    for await (const data of stream) {
         if (data.orderTrades) {
             const order = data.orderTrades;
             console.log('\n=== НОВАЯ СДЕЛКА ===');
             console.log('FIGI:', order.figi);
-            console.log('Направление:', order.direction === 1 ? 'ПОКУПКА' : 'ПРОДАЖА');
-            console.log('Кол-во:', order.trades.length, 'сделок');
+            console.log('Направление:', order.direction === OrderDirection.ORDER_DIRECTION_BUY ? 'ПОКУПКА' : 'ПРОДАЖА');
+            console.log('Кол-во сделок:', order.trades.length);
             
             for (const trade of order.trades) {
-                const price = Number(trade.price) / 100000000;
+                const price = api.helpers.toNumber(trade.price);
                 console.log('  Цена:', price, 'Кол-во:', trade.quantity);
                 
-                const counterPrice = order.direction === 1 
-                    ? price - PRICE_DELTA 
-                    : price + PRICE_DELTA;
+                const counterPrice = order.direction === OrderDirection.ORDER_DIRECTION_BUY 
+                    ? price + PRICE_DELTA 
+                    : price - PRICE_DELTA;
                 
-                console.log('  => Выставляю ордер на', order.direction === 1 ? 'ПРОДАЖУ' : 'ПОКУПКУ', 'по цене', counterPrice);
+                console.log('  => Выставляю ордер на', order.direction === OrderDirection.ORDER_DIRECTION_BUY ? 'ПРОДАЖУ' : 'ПОКУПКУ', 'по цене', counterPrice);
                 
                 try {
-                    const result = await api.investAPI.ordersService.PostOrder({
-                        accountId: account.id,
+                    const result = await tinkoffAccount.postOrder({
                         figi: FIGI,
                         quantity: trade.quantity,
-                        price: { units: Math.floor(counterPrice), nano: Math.round((counterPrice % 1) * 1000000000) },
-                        direction: order.direction === 1 ? 2 : 1,
-                        orderType: 1,
+                        price: api.helpers.toQuotation(counterPrice),
+                        direction: order.direction === OrderDirection.ORDER_DIRECTION_BUY 
+                            ? OrderDirection.ORDER_DIRECTION_SELL 
+                            : OrderDirection.ORDER_DIRECTION_BUY,
+                        orderType: OrderType.ORDER_TYPE_LIMIT,
                         orderId: `bot-${Date.now()}`
                     });
                     console.log('  Ордер отправлен:', result.orderId);
@@ -59,11 +55,7 @@ async function main() {
                 }
             }
         }
-    });
-    
-    stream.on('error', (err) => {
-        console.log('Ошибка потока:', err.message);
-    });
+    }
 }
 
 main().catch(console.error);
