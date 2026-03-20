@@ -56,10 +56,13 @@ async function main() {
                             const orderRequest = {
                                 accountId: accountId,
                                 figi: FIGI,
+                                instrumentId: FIGI,
                                 quantity: Number(trade.quantity),
                                 price: api.helpers.toQuotation(roundedPrice),
                                 direction: counterDirection,
                                 orderType: 1,
+                                timeInForce: 1, // TIME_IN_FORCE_DAY
+                                priceType: 1, // PRICE_TYPE_ORDER_PRICE
                                 orderId: `bot_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
                             };
                             console.log('  Отправляю:', JSON.stringify(orderRequest, (k, v) => v === undefined ? 'UNDEFINED' : v));
