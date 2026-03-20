@@ -16,11 +16,14 @@ async function main() {
     
     const tinkoffAccount = new RealAccount(api, account.id);
     
-    console.log('Подключение к потоку моих ордеров...');
+    console.log('Подключение к потоку моих ордеров (напрямую)...');
     
-    api.stream.trades.watch({ accounts: [account.id] }, (data) => {
-        console.log('\n=== ПОЛУЧЕНЫ ДАННЫЕ ===');
+    const call = api.ordersStream.tradesStream({ accounts: [account.id] });
+    
+    call.on('data', (data) => {
+        console.log('\n=== ДАННЫЕ ПОЛУЧЕНЫ ===');
         console.log('Ключи:', Object.keys(data));
+        console.log(JSON.stringify(data, null, 2));
         
         if (data.orderTrades) {
             const order = data.orderTrades;
@@ -39,8 +42,6 @@ async function main() {
                 const price = api.helpers.toNumber(trade.price);
                 console.log('  Сделка - Цена:', price, 'Кол-во:', trade.quantity);
                 
-                // При продаже -> ставим ордер на покупку (выше)
-                // При покупке -> ставим ордер на продажу (ниже)
                 const counterPrice = order.direction === OrderDirection.ORDER_DIRECTION_BUY 
                     ? price - PRICE_DELTA 
                     : price + PRICE_DELTA;
@@ -65,10 +66,19 @@ async function main() {
         }
     });
     
+    call.on('error', (err) => {
+        console.log('Ошибка потока:', err);
+    });
+    
+    call.on('end', () => {
+        console.log('Поток завершён');
+    });
+    
     console.log('Бот запущен. Ожидание моих сделок по', FIGI, '...');
     
     process.on('SIGINT', () => {
         console.log('\nВыключение...');
+        call.cancel();
         process.exit();
     });
 }
