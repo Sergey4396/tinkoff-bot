@@ -38,6 +38,7 @@ async function main() {
                     
                     for (const trade of order.trades) {
                         const price = Number(trade.price.units) + Number(trade.price.nano) / 1000000000;
+                        console.log('  Цена:', price, 'Кол-во:', trade.quantity);
                         
                         // После ПОКУПКИ -> ставим ПРОДАЖУ дороже (цена + дельта)
                         // После ПРОДАЖИ -> ставим ПОКУПКУ дешевле (цена - дельта)
@@ -46,6 +47,7 @@ async function main() {
                         const counterDirection = isBuy ? 2 : 1;
                         
                         const roundedPrice = Math.round(counterPrice * 1000) / 1000;
+                        console.log('  => Ордер на', isBuy ? 'ПРОДАЖУ' : 'ПОКУПКУ', 'по цене', roundedPrice);
                         
                         try {
                             const result = await api.orders.postOrder({
@@ -60,9 +62,9 @@ async function main() {
                                 priceType: 1,
                                 orderId: `bot_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
                             });
-                            console.log('Ордер отправлен:', result.orderId, isBuy ? 'SELL' : 'BUY', '@', roundedPrice);
+                            console.log('  => Ордер отправлен:', result.orderId);
                         } catch (e) {
-                            console.log('Ошибка:', e.message);
+                            console.log('  => Ошибка:', e.message);
                         }
                     }
                 }
