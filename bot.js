@@ -16,17 +16,20 @@ async function main() {
     
     const tinkoffAccount = new RealAccount(api, account.id);
     
-    console.log('Подключение к потоку сделок...');
+    console.log('Подключение к потоку моих ордеров...');
     
     api.stream.trades.watch({ accounts: [account.id] }, (data) => {
+        console.log('\n=== ПОЛУЧЕНЫ ДАННЫЕ ===');
+        console.log(JSON.stringify(data, null, 2));
+        
         if (data.orderTrades) {
             const order = data.orderTrades;
-            console.log('\n=== НОВАЯ СДЕЛКА ===');
+            console.log('\n--- МОЙ ОРДЕР ---');
             console.log('FIGI:', order.figi);
             console.log('Наш FIGI:', FIGI);
             console.log('Совпадение:', order.figi === FIGI ? 'ДА' : 'НЕТ');
+            console.log('Направление:', order.direction);
             
-            // Фильтруем только по нужному FIGI
             if (order.figi !== FIGI) {
                 console.log('Пропускаем - не наш FIGI');
                 return;
@@ -34,17 +37,19 @@ async function main() {
             
             for (const trade of order.trades) {
                 const price = api.helpers.toNumber(trade.price);
-                console.log('  Цена:', price, 'Кол-во:', trade.quantity);
+                console.log('  Сделка - Цена:', price, 'Кол-во:', trade.quantity);
                 
+                // При продаже -> ставим ордер на покупку (выше)
+                // При покупке -> ставим ордер на продажу (ниже)
                 const counterPrice = order.direction === OrderDirection.ORDER_DIRECTION_BUY 
-                    ? price + PRICE_DELTA 
-                    : price - PRICE_DELTA;
+                    ? price - PRICE_DELTA 
+                    : price + PRICE_DELTA;
                 
                 console.log('  => Выставляю ордер на', order.direction === OrderDirection.ORDER_DIRECTION_BUY ? 'ПРОДАЖУ' : 'ПОКУПКУ', 'по цене', counterPrice);
                 
                 tinkoffAccount.postOrder({
                     figi: FIGI,
-                    quantity: trade.quantity,
+                    quantity: Number(trade.quantity),
                     price: api.helpers.toQuotation(counterPrice),
                     direction: order.direction === OrderDirection.ORDER_DIRECTION_BUY 
                         ? OrderDirection.ORDER_DIRECTION_SELL 
@@ -59,11 +64,8 @@ async function main() {
             }
         }
     });
-            }
-        }
-    });
     
-    console.log('Бот запущен. Ожидание сделок...');
+    console.log('Бот запущен. Ожидание моих сделок по', FIGI, '...');
     
     process.on('SIGINT', () => {
         console.log('\nВыключение...');
