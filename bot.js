@@ -1,5 +1,4 @@
-import { TinkoffInvestApi, RealAccount } from 'tinkoff-invest-api';
-import { OrderDirection, OrderType } from 'tinkoff-invest-api/dist/generated/orders.js';
+import { TinkoffInvestApi } from 'tinkoff-invest-api';
 
 const TOKEN = 't.KNbRWnr_MoKUOuBfzvjyUTUYftgAdZhpZ4zBqfwkgYtd4wnOaYuHCJHAeRXounciZ3N4NSQGPtH-8v5Mw0f_fQ';
 const FIGI = 'FUTNGM032600';
@@ -13,12 +12,11 @@ async function main() {
     const { accounts } = await api.users.getAccounts({});
     const account = accounts[0];
     console.log('Аккаунт:', account.name, account.id);
-    
-    const tinkoffAccount = new RealAccount(api, account.id);
+    const accountId = account.id;
     
     console.log('Подключение к потоку моих ордеров...');
     
-    const stream = api.ordersStream.tradesStream({ accounts: [account.id] });
+    const stream = api.ordersStream.tradesStream({ accounts: [accountId] });
     
     (async () => {
         try {
@@ -39,26 +37,27 @@ async function main() {
                     }
                     
                     for (const trade of order.trades) {
-                        const price = api.helpers.toNumber(trade.price);
+                        const price = Number(trade.price.units) + Number(trade.price.nano) / 1000000000;
                         console.log('  Сделка - Цена:', price, 'Кол-во:', trade.quantity);
                         console.log('  Направление сделки:', order.direction, '(1=BUY, 2=SELL)');
                         
                         // После ПОКУПКИ -> ставим ПРОДАЖУ дороже (цена + дельта)
                         // После ПРОДАЖИ -> ставим ПОКУПКУ дешевле (цена - дельта)
                         const isBuy = order.direction === 1; // 1 = BUY
-                        const counterPrice = isBuy ? price + PRICE_DELTA : price - PRICE_DELTA;
+                        const counterPrice = Math.round((isBuy ? price + PRICE_DELTA : price - PRICE_DELTA) * 1000) / 1000;
                         const counterDirection = isBuy ? 2 : 1; // 2 = SELL, 1 = BUY
                         
                         console.log('  => Выставляю ордер на', isBuy ? 'ПРОДАЖУ' : 'ПОКУПКУ', 'по цене', counterPrice);
                         
                         try {
-                            const result = await tinkoffAccount.postOrder({
+                            const result = await api.orders.postOrder({
+                                accountId: accountId,
                                 figi: FIGI,
                                 quantity: Number(trade.quantity),
                                 price: { units: Math.floor(counterPrice), nano: Math.round((counterPrice % 1) * 1000000000) },
                                 direction: counterDirection,
-                                orderType: 1, // LIMIT
-                                orderId: `bot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+                                orderType: 1,
+                                orderId: `bot_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
                             });
                             console.log('  Ордер отправлен:', result.orderId);
                         } catch (e) {
