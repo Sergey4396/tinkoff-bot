@@ -41,23 +41,24 @@ async function main() {
                     for (const trade of order.trades) {
                         const price = api.helpers.toNumber(trade.price);
                         console.log('  Сделка - Цена:', price, 'Кол-во:', trade.quantity);
+                        console.log('  Направление сделки:', order.direction, '(1=BUY, 2=SELL)');
                         
-                        const counterPrice = order.direction === OrderDirection.ORDER_DIRECTION_BUY 
-                            ? price - PRICE_DELTA 
-                            : price + PRICE_DELTA;
+                        // После ПОКУПКИ -> ставим ПРОДАЖУ дороже (цена + дельта)
+                        // После ПРОДАЖИ -> ставим ПОКУПКУ дешевле (цена - дельта)
+                        const isBuy = order.direction === 1; // 1 = BUY
+                        const counterPrice = isBuy ? price + PRICE_DELTA : price - PRICE_DELTA;
+                        const counterDirection = isBuy ? 2 : 1; // 2 = SELL, 1 = BUY
                         
-                        console.log('  => Выставляю ордер на', order.direction === OrderDirection.ORDER_DIRECTION_BUY ? 'ПРОДАЖУ' : 'ПОКУПКУ', 'по цене', counterPrice);
+                        console.log('  => Выставляю ордер на', isBuy ? 'ПРОДАЖУ' : 'ПОКУПКУ', 'по цене', counterPrice);
                         
                         try {
                             const result = await tinkoffAccount.postOrder({
                                 figi: FIGI,
                                 quantity: Number(trade.quantity),
-                                price: api.helpers.toQuotation(counterPrice),
-                                direction: order.direction === OrderDirection.ORDER_DIRECTION_BUY 
-                                    ? OrderDirection.ORDER_DIRECTION_SELL 
-                                    : OrderDirection.ORDER_DIRECTION_BUY,
-                                orderType: OrderType.ORDER_TYPE_LIMIT,
-                                orderId: `bot-${Date.now()}`
+                                price: { units: Math.floor(counterPrice), nano: Math.round((counterPrice % 1) * 1000000000) },
+                                direction: counterDirection,
+                                orderType: 1, // LIMIT
+                                orderId: `bot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
                             });
                             console.log('  Ордер отправлен:', result.orderId);
                         } catch (e) {
