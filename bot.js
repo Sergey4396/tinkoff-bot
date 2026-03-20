@@ -49,10 +49,11 @@ async function main() {
                         
                         // Округляем чтобы избежать 3.1569999999999996
                         const roundedPrice = Math.round(counterPrice * 1000) / 1000;
-                        console.log('  => Выставляю ордер на', isBuy ? 'ПРОДАЖУ' : 'ПОКУПКУ', 'по цене', roundedPrice);
+                        const quotation = api.helpers.toQuotation(roundedPrice);
+                        console.log('  => Выставляю ордер на', isBuy ? 'ПРОДАЖУ' : 'ПОКУПКУ', 'по цене', roundedPrice, 'quotation:', JSON.stringify(quotation));
                         
                         try {
-                            const result = await api.orders.postOrder({
+                            const orderRequest = {
                                 accountId: accountId,
                                 figi: FIGI,
                                 quantity: Number(trade.quantity),
@@ -60,7 +61,9 @@ async function main() {
                                 direction: counterDirection,
                                 orderType: 1,
                                 orderId: `bot_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-                            });
+                            };
+                            console.log('  Отправляю:', JSON.stringify(orderRequest, (k, v) => v === undefined ? 'UNDEFINED' : v));
+                            const result = await api.orders.postOrder(orderRequest);
                             console.log('  Ордер отправлен:', result.orderId);
                         } catch (e) {
                             console.log('  Ошибка ордера:', e.message);
