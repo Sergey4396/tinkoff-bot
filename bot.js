@@ -16,69 +16,65 @@ async function main() {
     
     const tinkoffAccount = new RealAccount(api, account.id);
     
-    console.log('Подключение к потоку моих ордеров (напрямую)...');
+    console.log('Подключение к потоку моих ордеров...');
     
-    const call = api.ordersStream.tradesStream({ accounts: [account.id] });
+    const stream = api.ordersStream.tradesStream({ accounts: [account.id] });
     
-    call.on('data', (data) => {
-        console.log('\n=== ДАННЫЕ ПОЛУЧЕНЫ ===');
-        console.log('Ключи:', Object.keys(data));
-        console.log(JSON.stringify(data, null, 2));
-        
-        if (data.orderTrades) {
-            const order = data.orderTrades;
-            console.log('\n--- МОЙ ОРДЕР ---');
-            console.log('FIGI:', order.figi);
-            console.log('Наш FIGI:', FIGI);
-            console.log('Совпадение:', order.figi === FIGI ? 'ДА' : 'НЕТ');
-            console.log('Направление:', order.direction);
-            
-            if (order.figi !== FIGI) {
-                console.log('Пропускаем - не наш FIGI');
-                return;
+    (async () => {
+        try {
+            for await (const data of stream) {
+                console.log('\n=== ДАННЫЕ ПОЛУЧЕНЫ ===');
+                console.log('Ключи:', Object.keys(data));
+                
+                if (data.orderTrades) {
+                    const order = data.orderTrades;
+                    console.log('\n--- МОЙ ОРДЕР ---');
+                    console.log('FIGI:', order.figi);
+                    console.log('Наш FIGI:', FIGI);
+                    console.log('Совпадение:', order.figi === FIGI ? 'ДА' : 'НЕТ');
+                    
+                    if (order.figi !== FIGI) {
+                        console.log('Пропускаем - не наш FIGI');
+                        continue;
+                    }
+                    
+                    for (const trade of order.trades) {
+                        const price = api.helpers.toNumber(trade.price);
+                        console.log('  Сделка - Цена:', price, 'Кол-во:', trade.quantity);
+                        
+                        const counterPrice = order.direction === OrderDirection.ORDER_DIRECTION_BUY 
+                            ? price - PRICE_DELTA 
+                            : price + PRICE_DELTA;
+                        
+                        console.log('  => Выставляю ордер на', order.direction === OrderDirection.ORDER_DIRECTION_BUY ? 'ПРОДАЖУ' : 'ПОКУПКУ', 'по цене', counterPrice);
+                        
+                        try {
+                            const result = await tinkoffAccount.postOrder({
+                                figi: FIGI,
+                                quantity: Number(trade.quantity),
+                                price: api.helpers.toQuotation(counterPrice),
+                                direction: order.direction === OrderDirection.ORDER_DIRECTION_BUY 
+                                    ? OrderDirection.ORDER_DIRECTION_SELL 
+                                    : OrderDirection.ORDER_DIRECTION_BUY,
+                                orderType: OrderType.ORDER_TYPE_LIMIT,
+                                orderId: `bot-${Date.now()}`
+                            });
+                            console.log('  Ордер отправлен:', result.orderId);
+                        } catch (e) {
+                            console.log('  Ошибка ордера:', e.message);
+                        }
+                    }
+                }
             }
-            
-            for (const trade of order.trades) {
-                const price = api.helpers.toNumber(trade.price);
-                console.log('  Сделка - Цена:', price, 'Кол-во:', trade.quantity);
-                
-                const counterPrice = order.direction === OrderDirection.ORDER_DIRECTION_BUY 
-                    ? price - PRICE_DELTA 
-                    : price + PRICE_DELTA;
-                
-                console.log('  => Выставляю ордер на', order.direction === OrderDirection.ORDER_DIRECTION_BUY ? 'ПРОДАЖУ' : 'ПОКУПКУ', 'по цене', counterPrice);
-                
-                tinkoffAccount.postOrder({
-                    figi: FIGI,
-                    quantity: Number(trade.quantity),
-                    price: api.helpers.toQuotation(counterPrice),
-                    direction: order.direction === OrderDirection.ORDER_DIRECTION_BUY 
-                        ? OrderDirection.ORDER_DIRECTION_SELL 
-                        : OrderDirection.ORDER_DIRECTION_BUY,
-                    orderType: OrderType.ORDER_TYPE_LIMIT,
-                    orderId: `bot-${Date.now()}`
-                }).then(result => {
-                    console.log('  Ордер отправлен:', result.orderId);
-                }).catch(e => {
-                    console.log('  Ошибка ордера:', e.message);
-                });
-            }
+        } catch (err) {
+            console.log('Ошибка потока:', err);
         }
-    });
-    
-    call.on('error', (err) => {
-        console.log('Ошибка потока:', err);
-    });
-    
-    call.on('end', () => {
-        console.log('Поток завершён');
-    });
+    })();
     
     console.log('Бот запущен. Ожидание моих сделок по', FIGI, '...');
     
     process.on('SIGINT', () => {
         console.log('\nВыключение...');
-        call.cancel();
         process.exit();
     });
 }
