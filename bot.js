@@ -1,8 +1,14 @@
 import { TinkoffInvestApi } from 'tinkoff-invest-api';
 
 const TOKEN = 't.KNbRWnr_MoKUOuBfzvjyUTUYftgAdZhpZ4zBqfwkgYtd4wnOaYuHCJHAeRXounciZ3N4NSQGPtH-8v5Mw0f_fQ';
-const FIGI = 'FUTNGM032600';
-const PRICE_DELTA = 0.010;
+
+// Конфигурация инструментов: FIGI -> дельта цены
+const INSTRUMENTS = {
+    'FUTNGM032600': 0.010,  // NRH6
+    'FUTNG0326000': 0.025,   // NGH6
+    'FUTNG0426000': 0.010,  // NGJ6
+    'FUTNGM042600': 0.010,  // NRJ6
+};
 
 const api = new TinkoffInvestApi({ token: TOKEN });
 
@@ -14,36 +20,31 @@ async function main() {
     console.log('Аккаунт:', account.name, account.id);
     const accountId = account.id;
     
-    console.log('Подключение к потоку моих ордеров...');
+    console.log('Мониторим инструменты:', Object.keys(INSTRUMENTS));
     
     const stream = api.ordersStream.tradesStream({ accounts: [accountId] });
     
     (async () => {
         try {
             for await (const data of stream) {
-                console.log('\n=== ДАННЫЕ ПОЛУЧЕНЫ ===');
-                console.log('Ключи:', Object.keys(data));
-                
                 if (data.orderTrades) {
                     const order = data.orderTrades;
-                    console.log('\n--- МОЙ ОРДЕР ---');
-                    console.log('FIGI:', order.figi);
-                    console.log('Наш FIGI:', FIGI);
-                    console.log('Совпадение:', order.figi === FIGI ? 'ДА' : 'НЕТ');
+                    const figi = order.figi;
                     
-                    if (order.figi !== FIGI) {
-                        console.log('Пропускаем - не наш FIGI');
+                    // Проверяем есть ли FIGI в нашем списке
+                    if (!INSTRUMENTS.hasOwnProperty(figi)) {
                         continue;
                     }
+                    
+                    const priceDelta = INSTRUMENTS[figi];
+                    console.log('\n=== СДЕЛКА ===', figi);
                     
                     for (const trade of order.trades) {
                         const price = Number(trade.price.units) + Number(trade.price.nano) / 1000000000;
                         console.log('  Цена:', price, 'Кол-во:', trade.quantity);
                         
-                        // После ПОКУПКИ -> ставим ПРОДАЖУ дороже (цена + дельта)
-                        // После ПРОДАЖИ -> ставим ПОКУПКУ дешевле (цена - дельта)
                         const isBuy = order.direction === 1;
-                        const counterPrice = isBuy ? price + PRICE_DELTA : price - PRICE_DELTA;
+                        const counterPrice = isBuy ? price + priceDelta : price - priceDelta;
                         const counterDirection = isBuy ? 2 : 1;
                         
                         const roundedPrice = Math.round(counterPrice * 1000) / 1000;
@@ -52,8 +53,8 @@ async function main() {
                         try {
                             const result = await api.orders.postOrder({
                                 accountId: accountId,
-                                figi: FIGI,
-                                instrumentId: FIGI,
+                                figi: figi,
+                                instrumentId: figi,
                                 quantity: Number(trade.quantity),
                                 price: api.helpers.toQuotation(roundedPrice),
                                 direction: counterDirection,
@@ -74,7 +75,7 @@ async function main() {
         }
     })();
     
-    console.log('Бот запущен. Ожидание моих сделок по', FIGI, '...');
+    console.log('Бот запущен. Ожидание сделок...');
     
     process.on('SIGINT', () => {
         console.log('\nВыключение...');
