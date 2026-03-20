@@ -43,18 +43,20 @@ async function main() {
                         
                         // После ПОКУПКИ -> ставим ПРОДАЖУ дороже (цена + дельта)
                         // После ПРОДАЖИ -> ставим ПОКУПКУ дешевле (цена - дельта)
-                        const isBuy = order.direction === 1; // 1 = BUY
+                        const isBuy = order.direction === 1;
                         const counterPrice = isBuy ? price + PRICE_DELTA : price - PRICE_DELTA;
-                        const counterDirection = isBuy ? 2 : 1; // 2 = SELL, 1 = BUY
+                        const counterDirection = isBuy ? 2 : 1;
                         
-                        console.log('  => Выставляю ордер на', isBuy ? 'ПРОДАЖУ' : 'ПОКУПКУ', 'по цене', counterPrice);
+                        // Округляем чтобы избежать 3.1569999999999996
+                        const roundedPrice = Math.round(counterPrice * 1000) / 1000;
+                        console.log('  => Выставляю ордер на', isBuy ? 'ПРОДАЖУ' : 'ПОКУПКУ', 'по цене', roundedPrice);
                         
                         try {
                             const result = await api.orders.postOrder({
                                 accountId: accountId,
                                 figi: FIGI,
                                 quantity: Number(trade.quantity),
-                                price: api.helpers.toQuotation(counterPrice),
+                                price: api.helpers.toQuotation(roundedPrice),
                                 direction: counterDirection,
                                 orderType: 1,
                                 orderId: `bot_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
