@@ -38,8 +38,6 @@ async function main() {
                     
                     for (const trade of order.trades) {
                         const price = Number(trade.price.units) + Number(trade.price.nano) / 1000000000;
-                        console.log('  Сделка - Цена:', price, 'Кол-во:', trade.quantity);
-                        console.log('  Направление сделки:', order.direction, '(1=BUY, 2=SELL)');
                         
                         // После ПОКУПКИ -> ставим ПРОДАЖУ дороже (цена + дельта)
                         // После ПРОДАЖИ -> ставим ПОКУПКУ дешевле (цена - дельта)
@@ -47,13 +45,10 @@ async function main() {
                         const counterPrice = isBuy ? price + PRICE_DELTA : price - PRICE_DELTA;
                         const counterDirection = isBuy ? 2 : 1;
                         
-                        // Округляем чтобы избежать 3.1569999999999996
                         const roundedPrice = Math.round(counterPrice * 1000) / 1000;
-                        const quotation = api.helpers.toQuotation(roundedPrice);
-                        console.log('  => Выставляю ордер на', isBuy ? 'ПРОДАЖУ' : 'ПОКУПКУ', 'по цене', roundedPrice, 'quotation:', JSON.stringify(quotation));
                         
                         try {
-                            const orderRequest = {
+                            const result = await api.orders.postOrder({
                                 accountId: accountId,
                                 figi: FIGI,
                                 instrumentId: FIGI,
@@ -61,15 +56,13 @@ async function main() {
                                 price: api.helpers.toQuotation(roundedPrice),
                                 direction: counterDirection,
                                 orderType: 1,
-                                timeInForce: 1, // TIME_IN_FORCE_DAY
-                                priceType: 1, // PRICE_TYPE_ORDER_PRICE
+                                timeInForce: 1,
+                                priceType: 1,
                                 orderId: `bot_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-                            };
-                            console.log('  Отправляю:', JSON.stringify(orderRequest, (k, v) => v === undefined ? 'UNDEFINED' : v));
-                            const result = await api.orders.postOrder(orderRequest);
-                            console.log('  Ордер отправлен:', result.orderId);
+                            });
+                            console.log('Ордер отправлен:', result.orderId, isBuy ? 'SELL' : 'BUY', '@', roundedPrice);
                         } catch (e) {
-                            console.log('  Ошибка ордера:', e.message);
+                            console.log('Ошибка:', e.message);
                         }
                     }
                 }
