@@ -16,11 +16,9 @@ async function main() {
     
     const tinkoffAccount = new RealAccount(api, account.id);
     
-    console.log('Подключение к потоку...');
+    console.log('Подключение к потоку сделок...');
     
-    const stream = api.users.getUserOrdersStream({ accounts: [account.id] });
-    
-    for await (const data of stream) {
+    api.stream.trades.watch({ accounts: [account.id] }, (data) => {
         if (data.orderTrades) {
             const order = data.orderTrades;
             console.log('\n=== НОВАЯ СДЕЛКА ===');
@@ -38,24 +36,30 @@ async function main() {
                 
                 console.log('  => Выставляю ордер на', order.direction === OrderDirection.ORDER_DIRECTION_BUY ? 'ПРОДАЖУ' : 'ПОКУПКУ', 'по цене', counterPrice);
                 
-                try {
-                    const result = await tinkoffAccount.postOrder({
-                        figi: FIGI,
-                        quantity: trade.quantity,
-                        price: api.helpers.toQuotation(counterPrice),
-                        direction: order.direction === OrderDirection.ORDER_DIRECTION_BUY 
-                            ? OrderDirection.ORDER_DIRECTION_SELL 
-                            : OrderDirection.ORDER_DIRECTION_BUY,
-                        orderType: OrderType.ORDER_TYPE_LIMIT,
-                        orderId: `bot-${Date.now()}`
-                    });
+                tinkoffAccount.postOrder({
+                    figi: FIGI,
+                    quantity: trade.quantity,
+                    price: api.helpers.toQuotation(counterPrice),
+                    direction: order.direction === OrderDirection.ORDER_DIRECTION_BUY 
+                        ? OrderDirection.ORDER_DIRECTION_SELL 
+                        : OrderDirection.ORDER_DIRECTION_BUY,
+                    orderType: OrderType.ORDER_TYPE_LIMIT,
+                    orderId: `bot-${Date.now()}`
+                }).then(result => {
                     console.log('  Ордер отправлен:', result.orderId);
-                } catch (e) {
+                }).catch(e => {
                     console.log('  Ошибка ордера:', e.message);
-                }
+                });
             }
         }
-    }
+    });
+    
+    console.log('Бот запущен. Ожидание сделок...');
+    
+    process.on('SIGINT', () => {
+        console.log('\nВыключение...');
+        process.exit();
+    });
 }
 
 main().catch(console.error);
