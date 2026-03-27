@@ -29,8 +29,7 @@ async function processTrade(order, figi) {
         const price = Number(trade.price.units) + Number(trade.price.nano) / 1000000000;
         console.log('  Цена:', price, 'Кол-во:', trade.quantity);
         
-        // 1 = SELL, 2 = BUY в API Tinkoff
-        const isBuy = order.direction === 2;
+        const isBuy = order.direction === 1;
         const counterPrice = isBuy ? price + priceDelta : price - priceDelta;
         const counterDirection = isBuy ? 2 : 1;
         
