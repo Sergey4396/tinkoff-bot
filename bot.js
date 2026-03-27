@@ -17,16 +17,20 @@ let reconnectDelay = 1000;
 let isRunning = true;
 let reconnectTimeout = null;
 let isReconnecting = false;
+let lastTradeTime = Date.now();
+let healthCheckInterval = null;
 
 async function processTrade(order, figi) {
     const priceDelta = INSTRUMENTS[figi];
-    console.log('\n=== СДЕЛКА ===', figi);
+    console.log('\n=== СДЕЛКА ===', figi, 'direction:', order.direction);
+    lastTradeTime = Date.now();
     
     for (const trade of order.trades) {
         const price = Number(trade.price.units) + Number(trade.price.nano) / 1000000000;
         console.log('  Цена:', price, 'Кол-во:', trade.quantity);
         
-        const isBuy = order.direction === 1;
+        // 1 = SELL, 2 = BUY в API Tinkoff
+        const isBuy = order.direction === 2;
         const counterPrice = isBuy ? price + priceDelta : price - priceDelta;
         const counterDirection = isBuy ? 2 : 1;
         
@@ -51,6 +55,19 @@ async function processTrade(order, figi) {
             console.log('  => Ошибка:', e.message);
         }
     }
+}
+
+function startHealthCheck() {
+    // Проверяем каждые 60 секунд
+    healthCheckInterval = setInterval(() => {
+        const idleTime = Date.now() - lastTradeTime;
+        if (idleTime > 120000) { // 2 минуты без сделок
+            console.log(`[${new Date().toISOString()}] Нет активности ${Math.round(idleTime/1000)}s - переподключение...`);
+            isReconnecting = false;
+            reconnectDelay = 1000;
+            scheduleReconnect();
+        }
+    }, 60000);
 }
 
 function scheduleReconnect() {
@@ -111,7 +128,9 @@ async function main() {
     console.log('Мониторим инструменты:', Object.keys(INSTRUMENTS));
     
     reconnectDelay = 1000;
+    lastTradeTime = Date.now();
     connectStream();
+    startHealthCheck();
     
     console.log('Бот запущен. Ожидание сделок...');
 }
@@ -120,6 +139,7 @@ process.on('SIGINT', () => {
     console.log('\nВыключение...');
     isRunning = false;
     if (reconnectTimeout) clearTimeout(reconnectTimeout);
+    if (healthCheckInterval) clearInterval(healthCheckInterval);
     process.exit();
 });
 
