@@ -19,6 +19,8 @@ let reconnectTimeout = null;
 let isReconnecting = false;
 let lastTradeTime = Date.now();
 let healthCheckInterval = null;
+let currentStream = null;
+let streamActive = false;
 
 async function processTrade(order, figi) {
     const priceDelta = INSTRUMENTS[figi];
@@ -57,26 +59,27 @@ async function processTrade(order, figi) {
 }
 
 function startHealthCheck() {
-    // Проверяем каждые 60 секунд
+    // Проверяем каждые 5 минут
     healthCheckInterval = setInterval(() => {
+        if (isReconnecting) return; // Уже переподключаемся
+        
         const idleTime = Date.now() - lastTradeTime;
-        if (idleTime > 120000) { // 2 минуты без сделок
+        if (idleTime > 300000) { // 5 минут без сделок
             console.log(`[${new Date().toISOString()}] Нет активности ${Math.round(idleTime/1000)}s - переподключение...`);
-            isReconnecting = false;
-            reconnectDelay = 1000;
             scheduleReconnect();
         }
-    }, 60000);
+    }, 300000);
 }
 
 function scheduleReconnect() {
     if (!isRunning || isReconnecting) return;
     
     isReconnecting = true;
+    streamActive = false;
     console.log(`Переподключение через ${reconnectDelay}ms...`);
     
     reconnectTimeout = setTimeout(() => {
-        isReconnecting = false;
+        reconnectDelay = 1000;
         connectStream();
     }, reconnectDelay);
     
@@ -86,14 +89,25 @@ function scheduleReconnect() {
 async function connectStream() {
     if (!isRunning) return;
     
+    // Закрываем старый стрим если есть
+    if (currentStream) {
+        try {
+            currentStream.cancel();
+        } catch (e) {}
+        currentStream = null;
+    }
+    
     console.log(`[${new Date().toISOString()}] Подключение к потоку...`);
+    streamActive = true;
+    isReconnecting = false;
     
     try {
-        const stream = api.ordersStream.tradesStream({ accounts: [accountId] });
+        currentStream = api.ordersStream.tradesStream({ accounts: [accountId] });
         
         (async () => {
             try {
-                for await (const data of stream) {
+                for await (const data of currentStream) {
+                    if (!streamActive) return; // Уже неактивен
                     if (data.orderTrades) {
                         const order = data.orderTrades;
                         const figi = order.figi;
@@ -104,10 +118,11 @@ async function connectStream() {
                     }
                 }
             } catch (err) {
-                console.log('Поток прерван:', err.message);
+                if (streamActive) {
+                    console.log('Поток прерван:', err.message);
+                    scheduleReconnect();
+                }
             }
-            
-            scheduleReconnect();
         })();
         
     } catch (err) {
@@ -137,6 +152,10 @@ async function main() {
 process.on('SIGINT', () => {
     console.log('\nВыключение...');
     isRunning = false;
+    streamActive = false;
+    if (currentStream) {
+        try { currentStream.cancel(); } catch (e) {}
+    }
     if (reconnectTimeout) clearTimeout(reconnectTimeout);
     if (healthCheckInterval) clearInterval(healthCheckInterval);
     process.exit();
