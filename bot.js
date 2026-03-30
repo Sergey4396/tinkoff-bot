@@ -74,13 +74,24 @@ async function connectStream() {
         (async () => {
             try {
                 for await (const data of stream) {
-                    if (data.orderTrades) {
+                    // Логируем что пришло
+                    if (data.subscription) {
+                        console.log(`[${new Date().toISOString()}] Подписка: ${JSON.stringify(data.subscription)}`);
+                    } else if (data.ping) {
+                        console.log(`[${new Date().toISOString()}] Ping`);
+                    } else if (data.orderTrades) {
                         const order = data.orderTrades;
                         const figi = order.figi;
                         
+                        console.log(`[${new Date().toISOString()}] Получен ордер: ${figi}`);
+                        
                         if (INSTRUMENTS.hasOwnProperty(figi)) {
                             await processTrade(order, figi);
+                        } else {
+                            console.log(`  => FIGI ${figi} не в списке`);
                         }
+                    } else {
+                        console.log(`[${new Date().toISOString()}] Неизвестные данные: ${JSON.stringify(data)}`);
                     }
                 }
             } catch (err) {
