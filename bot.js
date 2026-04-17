@@ -3,13 +3,17 @@ import { TinkoffInvestApi } from 'tinkoff-invest-api';
 const TOKEN = 't.KNbRWnr_MoKUOuBfzvjyUTUYftgAdZhpZ4zBqfwkgYtd4wnOaYuHCJHAeRXounciZ3N4NSQGPtH-8v5Mw0f_fQ';
 
 const INSTRUMENTS = {
-    'FUTNGM032600': 0.010,  // NRH6
+    'FUTNGM042600': 0.012,  // NRJ6
     'FUTNG0326000': 0.030,   // NGH6
     'FUTNG0426000': 0.007,  // NGJ6
     'FUTNG0526000': 0.007,  // NGK6
     'FUTSILVM0626': 1,       // S1M6
+    'FUTBRM062600': 1,   // BMN6
+    'FTTF05260000': 0.5,   //FFK6
 };
-
+// переход в раздел с ботом   -   ~# cd ~/tinkoff-bot
+//запуск -     nohup node bot.js > bot.log 2>&1 &
+// проверка работы -   ps aux | grep node
 const api = new TinkoffInvestApi({ token: TOKEN });
 let accountId = null;
 let reconnectDelay = 1000;
