@@ -8,10 +8,11 @@ const INSTRUMENTS = {
     'FUTNG0426000': 0.007,  // NGJ6
     'FUTNG0526000': 0.007,  // NGK6
     'FUTSILVM0626': 1,       // S1M6
-    'FUTBRM062600': 1,   // BMN6
+    'FUTBRM072600': 1,   // BMN6
     'FTTF05260000': 0.5,   //FFK6
 };
 // переход в раздел с ботом   -   ~# cd ~/tinkoff-bot
+// остановка работающего pkill -f "node bot.js"
 //запуск -     nohup node bot.js > bot.log 2>&1 &
 // проверка работы -   ps aux | grep node
 const api = new TinkoffInvestApi({ token: TOKEN });
