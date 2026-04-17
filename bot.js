@@ -19,8 +19,20 @@ const api = new TinkoffInvestApi({ token: TOKEN });
 let accountId = null;
 let reconnectDelay = 1000;
 let isRunning = true;
+const processedTrades = new Set();
 
 async function processTrade(order, figi) {
+    const orderId = order.orderId || order.order_id;
+    if (processedTrades.has(orderId)) {
+        console.log(`  => Ордер ${orderId} уже обработан, пропускаем`);
+        return;
+    }
+    processedTrades.add(orderId);
+    
+    if (processedTrades.size > 1000) {
+        processedTrades.clear();
+    }
+    
     const priceDelta = INSTRUMENTS[figi];
     console.log(`\n=== СДЕЛКА === ${figi} direction: ${order.direction}`);
     
