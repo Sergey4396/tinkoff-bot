@@ -4,7 +4,7 @@ const TOKEN = 't.KNbRWnr_MoKUOuBfzvjyUTUYftgAdZhpZ4zBqfwkgYtd4wnOaYuHCJHAeRXounc
 
 const INSTRUMENTS = {
 //    'FUTNGM042600': 0.012,  // NRJ6
-    'FUTNG0326000': 0.030,   // NGH6
+    'FUTNG0626000': 0.030,   // NRM6
     'FUTNG0426000': 0.007,  // NGJ6
     'FUTNG0526000': 0.032,  // NGK6
     'FUTSILVM0626': 1,       // S1M6
