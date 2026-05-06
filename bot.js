@@ -3,6 +3,7 @@ import { TinkoffInvestApi } from 'tinkoff-invest-api';
 const TOKEN = 't.KNbRWnr_MoKUOuBfzvjyUTUYftgAdZhpZ4zBqfwkgYtd4wnOaYuHCJHAeRXounciZ3N4NSQGPtH-8v5Mw0f_fQ';
 
 const INSTRUMENTS = {
+'FUTNGM052600': 0.012,  // NRK6
     'FUTNGM062600': 0.012,  // NRM6
     'FUTNG0626000': 0.030,   // NGM6
     'FUTNG0426000': 0.007,  // NGJ6
@@ -15,6 +16,14 @@ const INSTRUMENTS = {
 // остановка работающего pkill -f "node bot.js"
 //запуск -     nohup node bot.js > bot.log 2>&1 &
 // проверка работы -   ps aux | grep node
+
+//теперь так
+//systemctl status tinkoff-bot      # статус
+//tail -f ~/tinkoff-bot/bot.log     # логи в реальном времени
+//systemctl restart tinkoff-bot     # перезапуск
+//systemctl stop tinkoff-bot        # остановка
+
+
 const api = new TinkoffInvestApi({ token: TOKEN });
 let accountId = null;
 let reconnectDelay = 1000;
