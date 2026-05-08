@@ -31,21 +31,25 @@ let isRunning = true;
 const processedTrades = new Set();
 
 async function processTrade(order, figi) {
-    const orderId = order.orderId || order.order_id;
-    if (processedTrades.has(orderId)) {
-        console.log(`  => Ордер ${orderId} уже обработан, пропускаем`);
-        return;
-    }
-    processedTrades.add(orderId);
-    
-    if (processedTrades.size > 1000) {
-        processedTrades.clear();
-    }
-    
     const priceDelta = INSTRUMENTS[figi];
     console.log(`\n=== СДЕЛКА === ${figi} direction: ${order.direction}`);
     
     for (const trade of order.trades) {
+        const tradeId = trade.tradeId || trade.trade_id;
+        if (!tradeId) {
+            console.log(`  => Нет tradeId, пропускаем`);
+            continue;
+        }
+        if (processedTrades.has(tradeId)) {
+            console.log(`  => Трейд ${tradeId} уже обработан, пропускаем`);
+            continue;
+        }
+        processedTrades.add(tradeId);
+        
+        if (processedTrades.size > 1000) {
+            processedTrades.clear();
+        }
+        
         const price = Number(trade.price.units) + Number(trade.price.nano) / 1000000000;
         console.log(`  Цена: ${price} Кол-во: ${trade.quantity}`);
         
