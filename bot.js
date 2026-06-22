@@ -3,6 +3,7 @@ import { TinkoffInvestApi } from 'tinkoff-invest-api';
 const TOKEN = 't.KNbRWnr_MoKUOuBfzvjyUTUYftgAdZhpZ4zBqfwkgYtd4wnOaYuHCJHAeRXounciZ3N4NSQGPtH-8v5Mw0f_fQ';
 
 const INSTRUMENTS = {
+'FUTNGM072600': 0.013,  // NRN6
 'FUTNGM052600': 0.012,  // NRK6
     'FUTNGM062600': 0.012,  // NRM6
     'FUTNG0626000': 0.030,   // NGM6
