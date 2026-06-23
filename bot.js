@@ -127,6 +127,8 @@ async function connectStream() {
                 }
             } catch (err) {
                 console.log(`[${new Date().toISOString()}] Поток прерван: ${err.message}`);
+            } finally {
+                console.log(`[${new Date().toISOString()}] Поток закрыт, переподключаюсь...`);
                 scheduleReconnect();
             }
         })();
