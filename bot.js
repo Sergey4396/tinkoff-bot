@@ -29,6 +29,8 @@ const api = new TinkoffInvestApi({ token: TOKEN });
 let accountId = null;
 let reconnectDelay = 1000;
 let isRunning = true;
+let isConnecting = false;
+let lastActivity = Date.now();
 const processedTrades = new Set();
 
 async function processTrade(order, figi) {
@@ -84,6 +86,8 @@ async function processTrade(order, figi) {
 function scheduleReconnect() {
     if (!isRunning) return;
     
+    isConnecting = false;
+    
     console.log(`[${new Date().toISOString()}] Переподключение через ${reconnectDelay}ms...`);
     
     setTimeout(() => {
@@ -95,7 +99,8 @@ function scheduleReconnect() {
 }
 
 async function connectStream() {
-    if (!isRunning) return;
+    if (!isRunning || isConnecting) return;
+    isConnecting = true;
     
     console.log(`[${new Date().toISOString()}] Подключение к потоку...`);
     
@@ -105,6 +110,7 @@ async function connectStream() {
         (async () => {
             try {
                 for await (const data of stream) {
+                    lastActivity = Date.now();
                     // Логируем что пришло
                     if (data.subscription) {
                         console.log(`[${new Date().toISOString()}] Подписка: ${JSON.stringify(data.subscription)}`);
@@ -128,6 +134,7 @@ async function connectStream() {
             } catch (err) {
                 console.log(`[${new Date().toISOString()}] Поток прерван: ${err.message}`);
             } finally {
+                isConnecting = false;
                 console.log(`[${new Date().toISOString()}] Поток закрыт, переподключаюсь...`);
                 scheduleReconnect();
             }
@@ -135,7 +142,10 @@ async function connectStream() {
         
     } catch (err) {
         console.log(`[${new Date().toISOString()}] Ошибка подключения: ${err.message}`);
+        isConnecting = false;
         scheduleReconnect();
+    } finally {
+        isConnecting = false;
     }
 }
 
@@ -151,6 +161,15 @@ async function main() {
     
     reconnectDelay = 1000;
     connectStream();
+    
+    setInterval(() => {
+        if (!isRunning) return;
+        if (Date.now() - lastActivity > 240000) {
+            console.log(`[${new Date().toISOString()}] Watchdog: нет данных 4 мин, переподключаюсь`);
+            reconnectDelay = 1000;
+            scheduleReconnect();
+        }
+    }, 60000);
     
     console.log('Бот запущен. Ожидание сделок...');
 }
