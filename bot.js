@@ -30,6 +30,7 @@ let accountId = null;
 let reconnectDelay = 1000;
 let isRunning = true;
 let isConnecting = false;
+let currentStream = null;
 let lastActivity = Date.now();
 const processedTrades = new Set();
 
@@ -104,8 +105,14 @@ async function connectStream() {
     
     console.log(`[${new Date().toISOString()}] Подключение к потоку...`);
     
+    if (currentStream) {
+        try { currentStream.cancel(); } catch (e) {}
+        currentStream = null;
+    }
+    
     try {
-        const stream = api.ordersStream.tradesStream({ accounts: [accountId] });
+        currentStream = api.ordersStream.tradesStream({ accounts: [accountId] });
+        const stream = currentStream;
         
         (async () => {
             try {
@@ -142,9 +149,11 @@ async function connectStream() {
         
     } catch (err) {
         console.log(`[${new Date().toISOString()}] Ошибка подключения: ${err.message}`);
+        currentStream = null;
         isConnecting = false;
         scheduleReconnect();
     } finally {
+        currentStream = null;
         isConnecting = false;
     }
 }
