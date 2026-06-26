@@ -3,7 +3,7 @@ import { TinkoffInvestApi } from 'tinkoff-invest-api';
 const TOKEN = 't.KNbRWnr_MoKUOuBfzvjyUTUYftgAdZhpZ4zBqfwkgYtd4wnOaYuHCJHAeRXounciZ3N4NSQGPtH-8v5Mw0f_fQ';
 
 const INSTRUMENTS = {
-'FWUSH0926000': 5 //WUU6
+'FWUSH0926000': 5, //WUU6
 'FUTNGM072600': 0.013,  // NRN6
 'FUTNGM052600': 0.012,  // NRK6
     'FUTNGM062600': 0.012,  // NRM6
@@ -24,6 +24,10 @@ const INSTRUMENTS = {
 //tail -f ~/tinkoff-bot/bot.log     # логи в реальном времени
 //systemctl restart tinkoff-bot     # перезапуск
 //systemctl stop tinkoff-bot        # остановка
+
+//Так ищем фиги
+//cd ~/tinkoff-bot && git pull
+//  node find_figi.js NRM6
 
 
 const api = new TinkoffInvestApi({ token: TOKEN });
