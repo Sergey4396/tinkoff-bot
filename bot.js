@@ -3,6 +3,8 @@ import { TinkoffInvestApi } from 'tinkoff-invest-api';
 const TOKEN = 't.KNbRWnr_MoKUOuBfzvjyUTUYftgAdZhpZ4zBqfwkgYtd4wnOaYuHCJHAeRXounciZ3N4NSQGPtH-8v5Mw0f_fQ';
 
 const INSTRUMENTS = {
+
+'FSMLT0926000': 3, //SSU6
 'FWUSH0926000': 5, //WUU6
 'FUTNGM072600': 0.013,  // NRN6
 'FUTNGM052600': 0.012,  // NRK6
