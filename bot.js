@@ -37,7 +37,6 @@ let accountId = null;
 let reconnectDelay = 1000;
 let isRunning = true;
 let isConnecting = false;
-let currentStream = null;
 let lastActivity = Date.now();
 const processedTrades = new Set();
 
@@ -112,20 +111,13 @@ async function connectStream() {
     
     console.log(`[${new Date().toISOString()}] Подключение к потоку...`);
     
-    if (currentStream) {
-        try { currentStream.cancel(); } catch (e) {}
-        currentStream = null;
-    }
-    
     try {
-        currentStream = api.ordersStream.tradesStream({ accounts: [accountId] });
-        const stream = currentStream;
+        const stream = api.ordersStream.tradesStream({ accounts: [accountId] });
         
         (async () => {
             try {
                 for await (const data of stream) {
                     lastActivity = Date.now();
-                    // Логируем что пришло
                     if (data.subscription) {
                         console.log(`[${new Date().toISOString()}] Подписка: ${JSON.stringify(data.subscription)}`);
                     } else if (data.ping) {
@@ -133,9 +125,7 @@ async function connectStream() {
                     } else if (data.orderTrades) {
                         const order = data.orderTrades;
                         const figi = order.figi;
-                        
                         console.log(`[${new Date().toISOString()}] Получен ордер: ${figi}`);
-                        
                         if (INSTRUMENTS.hasOwnProperty(figi)) {
                             await processTrade(order, figi);
                         } else {
@@ -146,21 +136,24 @@ async function connectStream() {
                     }
                 }
             } catch (err) {
-                console.log(`[${new Date().toISOString()}] Поток прерван: ${err.message}`);
+                const msg = err.message || '';
+                if (msg.includes('RESOURCE_EXHAUSTED')) {
+                    console.log(`[${new Date().toISOString()}] Лимит стримов, перезапуск...`);
+                    isRunning = false;
+                    process.exit(1);
+                }
+                console.log(`[${new Date().toISOString()}] Поток прерван: ${msg}`);
             } finally {
                 isConnecting = false;
-                console.log(`[${new Date().toISOString()}] Поток закрыт, переподключаюсь...`);
                 scheduleReconnect();
             }
         })();
         
     } catch (err) {
         console.log(`[${new Date().toISOString()}] Ошибка подключения: ${err.message}`);
-        currentStream = null;
         isConnecting = false;
         scheduleReconnect();
     } finally {
-        currentStream = null;
         isConnecting = false;
     }
 }
@@ -181,9 +174,9 @@ async function main() {
     setInterval(() => {
         if (!isRunning) return;
         if (Date.now() - lastActivity > 240000) {
-            console.log(`[${new Date().toISOString()}] Watchdog: нет данных 4 мин, переподключаюсь`);
-            reconnectDelay = 1000;
-            scheduleReconnect();
+            console.log(`[${new Date().toISOString()}] Watchdog: нет данных 4 мин, перезапуск...`);
+            isRunning = false;
+            process.exit(1);
         }
     }, 60000);
     
