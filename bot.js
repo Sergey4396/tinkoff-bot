@@ -42,9 +42,24 @@ let isConnecting = false;
 let lastActivity = Date.now();
 const processedTrades = new Set();
 
+function isAfterHours() {
+    const now = new Date();
+    const mskHour = (now.getUTCHours() + 3) % 24;
+    const mskMin = now.getUTCMinutes();
+    return mskHour < 7 || (mskHour === 7 && mskMin < 1);
+}
+
 async function processTrade(order, figi) {
     const priceDelta = INSTRUMENTS[figi];
     console.log(`\n=== СДЕЛКА === ${figi} direction: ${order.direction}`);
+    
+    if (isAfterHours()) {
+        const now = new Date();
+        const h = (now.getUTCHours() + 3) % 24;
+        const m = String(now.getUTCMinutes()).padStart(2, '0');
+        console.log(`  => Пропущен: до 07:01 МСК (сейчас ${h}:${m})`);
+        return;
+    }
     
     for (const trade of order.trades) {
         const tradeId = trade.tradeId || trade.trade_id;
