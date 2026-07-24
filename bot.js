@@ -49,16 +49,30 @@ function isAfterHours() {
     return mskHour < 7 || (mskHour === 7 && mskMin < 1);
 }
 
+function mskTime() {
+    const now = new Date();
+    return { h: (now.getUTCHours() + 3) % 24, m: now.getUTCMinutes() };
+}
+
+function isWideOffsetPeriod() {
+    const { h, m } = mskTime();
+    const totalMin = h * 60 + m;
+    return totalMin >= 13 * 60 + 20 && totalMin < 13 * 60 + 50;
+}
+
 async function processTrade(order, figi) {
-    const priceDelta = INSTRUMENTS[figi];
     console.log(`\n=== СДЕЛКА === ${figi} direction: ${order.direction}`);
     
     if (isAfterHours()) {
-        const now = new Date();
-        const h = (now.getUTCHours() + 3) % 24;
-        const m = String(now.getUTCMinutes()).padStart(2, '0');
-        console.log(`  => Пропущен: до 07:01 МСК (сейчас ${h}:${m})`);
+        const { h, m } = mskTime();
+        console.log(`  => Пропущен: до 07:01 МСК (сейчас ${h}:${String(m).padStart(2, '0')})`);
         return;
+    }
+    
+    let priceDelta = INSTRUMENTS[figi];
+    if (isWideOffsetPeriod()) {
+        console.log(`  => Расширенный отступ: 10 (вместо ${priceDelta})`);
+        priceDelta = 10;
     }
     
     for (const trade of order.trades) {
