@@ -161,9 +161,10 @@ async function processTrade(order, figi) {
                 const lots = each + (i < extra ? 1 : 0);
                 if (lots === 0) continue;
                 const offsetStep = 2 + i;
+                const wideDelta = priceDelta + 1 + i;
                 const widePrice = isBuy
-                    ? price + priceDelta + offsetStep
-                    : price - priceDelta - offsetStep;
+                    ? price + wideDelta
+                    : price - wideDelta;
                 const roundedWide = Math.round(widePrice * 1000) / 1000;
                 const oid = `w${offsetStep}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
                 try {
