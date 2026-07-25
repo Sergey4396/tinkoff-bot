@@ -119,6 +119,25 @@ async function processTrade(order, figi) {
         
         console.log(`  => offset1 всего/нужно/ставим: ${active1Lots}/${needed1}/${place1}, wide: ${placeWide}`);
         
+        const useWideDist = figi === 'FSMLT0926000' || figi === 'FWUSH0926000';
+        
+        if (!useWideDist) {
+            const oid = `1_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+            try {
+                const r = await api.orders.postOrder({
+                    accountId, figi, instrumentId: figi,
+                    quantity: Number(trade.quantity),
+                    price: api.helpers.toQuotation(roundedBase),
+                    direction: counterDirection,
+                    orderType: 1, timeInForce: 1, priceType: 1, orderId: oid,
+                });
+                console.log(`  => offset1 ${trade.quantity} @ ${roundedBase}: ${r.orderId}`);
+            } catch (e) {
+                console.log(`  => Ошибка offset1: ${e.message}`);
+            }
+            continue;
+        }
+        
         if (place1 > 0) {
             const oid = `1_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
             try {
