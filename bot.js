@@ -41,6 +41,7 @@ let isRunning = true;
 let isConnecting = false;
 let lastActivity = Date.now();
 const processedTrades = new Set();
+const ourOrders = new Map(); // serverOrderId -> {price, lots, dir, figi}
 
 function isAfterHours() {
     const now = new Date();
@@ -52,39 +53,61 @@ function isAfterHours() {
 async function getActiveOrders(figi) {
     try {
         const res = await api.orders.getOrders({ accountId });
-        const orders = (res.orders || []).filter(o => o.figi === figi || o.instrumentId === figi);
-        console.log(`  => Активных заявок по ${figi}: ${orders.length}`);
-        return orders;
+        const active = (res.orders || []).filter(o => o.figi === figi || o.instrumentId === figi);
+        
+        const activeIds = new Set(active.map(o => o.orderId));
+        for (const [id] of ourOrders) {
+            if (!activeIds.has(id)) ourOrders.delete(id);
+        }
+        
+        return active;
     } catch (e) {
         console.log(`  => Ошибка getOrders: ${e.message}`);
         return [];
     }
 }
 
-function countActiveOffset1(orders, price) {
+function countAtPrice(price) {
     let lots = 0;
-    for (const o of orders) {
-        if (o.orderId?.startsWith('1_')) {
-            const p = Number(o.price.units) + Number(o.price.nano) / 1000000000;
-            if (Math.abs(p - price) < 0.0005) {
-                lots += Number(o.quantity);
-            }
+    for (const [, info] of ourOrders) {
+        if (info.type === '1' && Math.abs(info.price - price) < 0.0005) {
+            lots += info.lots;
         }
     }
     return lots;
 }
 
-function getWideCounts(orders) {
+function wideCounts() {
     const counts = {};
     for (let step = 2; step <= 11; step++) counts[step] = 0;
-    for (const o of orders) {
-        const m = o.orderId?.match(/^w(\d+)_/);
-        if (m) {
-            const step = parseInt(m[1]);
-            if (step >= 2 && step <= 11) counts[step] += Number(o.quantity);
+    for (const [, info] of ourOrders) {
+        if (info.type?.startsWith('w')) {
+            const step = parseInt(info.type.substring(1));
+            if (step >= 2 && step <= 11) counts[step] += info.lots;
         }
     }
     return counts;
+}
+
+function genId() {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
+}
+
+async function placeOrder(figi, lots, price, direction, type) {
+    if (lots <= 0) return;
+    const oid = genId();
+    try {
+        const r = await api.orders.postOrder({
+            accountId, figi, instrumentId: figi,
+            quantity: lots,
+            price: api.helpers.toQuotation(price),
+            direction, orderType: 1, timeInForce: 1, priceType: 1, orderId: oid,
+        });
+        ourOrders.set(r.orderId, { price, lots, type, figi });
+        console.log(`  => ${type} ${lots} @ ${price}: ${r.orderId}`);
+    } catch (e) {
+        console.log(`  => Ошибка ${type}: ${e.message}`);
+    }
 }
 
 async function processTrade(order, figi) {
@@ -99,8 +122,7 @@ async function processTrade(order, figi) {
         return;
     }
     
-    const activeOrders = await getActiveOrders(figi);
-    let active1LotsGlobal = 0;
+    await getActiveOrders(figi);
     
     for (const trade of order.trades) {
         const tradeId = trade.tradeId || trade.trade_id;
@@ -126,76 +148,37 @@ async function processTrade(order, figi) {
         const basePrice = isBuy ? price + priceDelta : price - priceDelta;
         const roundedBase = Math.round(basePrice * 1000) / 1000;
         
-        let active1Lots = countActiveOffset1(activeOrders, roundedBase) + active1LotsGlobal;
-        const needed1 = Math.max(0, 10 - active1Lots);
-        const place1 = Math.min(Number(trade.quantity), needed1);
-        const placeWide = Number(trade.quantity) - place1;
-        active1LotsGlobal += place1;
-        
-        console.log(`  => offset1 всего/нужно/ставим: ${active1Lots}/${needed1}/${place1}, wide: ${placeWide}`);
-        
         const useWideDist = figi === 'FSMLT0926000' || figi === 'FWUSH0926000';
         
         if (!useWideDist) {
-            const oid = `1_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-            try {
-                const r = await api.orders.postOrder({
-                    accountId, figi, instrumentId: figi,
-                    quantity: Number(trade.quantity),
-                    price: api.helpers.toQuotation(roundedBase),
-                    direction: counterDirection,
-                    orderType: 1, timeInForce: 1, priceType: 1, orderId: oid,
-                });
-                console.log(`  => offset1 ${trade.quantity} @ ${roundedBase}: ${r.orderId}`);
-            } catch (e) {
-                console.log(`  => Ошибка offset1: ${e.message}`);
-            }
+            await placeOrder(figi, Number(trade.quantity), roundedBase, counterDirection, '1');
             continue;
         }
         
+        let active1Lots = countAtPrice(roundedBase);
+        const needed1 = Math.max(0, 10 - active1Lots);
+        const place1 = Math.min(Number(trade.quantity), needed1);
+        const placeWide = Number(trade.quantity) - place1;
+        
+        console.log(`  => offset1 всего/нужно/ставим: ${active1Lots}/${needed1}/${place1}, wide: ${placeWide}`);
+        
         if (place1 > 0) {
-            const oid = `1_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-            try {
-                const r = await api.orders.postOrder({
-                    accountId, figi, instrumentId: figi,
-                    quantity: place1,
-                    price: api.helpers.toQuotation(roundedBase),
-                    direction: counterDirection,
-                    orderType: 1, timeInForce: 1, priceType: 1, orderId: oid,
-                });
-                console.log(`  => offset1 ${place1} @ ${roundedBase}: ${r.orderId}`);
-            } catch (e) {
-                console.log(`  => Ошибка offset1: ${e.message}`);
-            }
+            await placeOrder(figi, place1, roundedBase, counterDirection, '1');
         }
         
         if (placeWide > 0) {
-            const wideCounts = getWideCounts(activeOrders);
-            console.log(`  => wide загруженность: ${JSON.stringify(wideCounts)}`);
-            const sorted = Object.entries(wideCounts).sort((a, b) => a[1] - b[1]);
+            const wc = wideCounts();
+            console.log(`  => wide загруженность: ${JSON.stringify(wc)}`);
+            const sorted = Object.entries(wc).sort((a, b) => a[1] - b[1]);
             let remain = placeWide;
             while (remain > 0) {
                 for (const [step, count] of sorted) {
                     if (remain === 0) break;
                     const offsetStep = parseInt(step);
                     const wideDelta = priceDelta + offsetStep - 1;
-                    const widePrice = isBuy
-                        ? price + wideDelta
-                        : price - wideDelta;
+                    const widePrice = isBuy ? price + wideDelta : price - wideDelta;
                     const roundedWide = Math.round(widePrice * 1000) / 1000;
-                    const oid = `w${offsetStep}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-                    try {
-                        const r = await api.orders.postOrder({
-                            accountId, figi, instrumentId: figi,
-                            quantity: 1,
-                            price: api.helpers.toQuotation(roundedWide),
-                            direction: counterDirection,
-                            orderType: 1, timeInForce: 1, priceType: 1, orderId: oid,
-                        });
-                        console.log(`  => w${offsetStep} 1 @ ${roundedWide}: ${r.orderId}`);
-                    } catch (e) {
-                        console.log(`  => Ошибка w${offsetStep}: ${e.message}`);
-                    }
+                    await placeOrder(figi, 1, roundedWide, counterDirection, `w${offsetStep}`);
                     remain--;
                 }
             }
