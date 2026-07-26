@@ -59,7 +59,7 @@ async function getActiveOrders(figi) {
     }
 }
 
-function countActiveOffset1(orders, figi, price) {
+function countActiveOffset1(orders, price) {
     let lots = 0;
     for (const o of orders) {
         if (o.orderId?.startsWith('1_')) {
@@ -70,6 +70,19 @@ function countActiveOffset1(orders, figi, price) {
         }
     }
     return lots;
+}
+
+function getWideCounts(orders) {
+    const counts = {};
+    for (let step = 2; step <= 11; step++) counts[step] = 0;
+    for (const o of orders) {
+        const m = o.orderId?.match(/^w(\d+)_/);
+        if (m) {
+            const step = parseInt(m[1]);
+            if (step >= 2 && step <= 11) counts[step] += Number(o.quantity);
+        }
+    }
+    return counts;
 }
 
 async function processTrade(order, figi) {
@@ -111,7 +124,7 @@ async function processTrade(order, figi) {
         const basePrice = isBuy ? price + priceDelta : price - priceDelta;
         const roundedBase = Math.round(basePrice * 1000) / 1000;
         
-        let active1Lots = countActiveOffset1(activeOrders, figi, roundedBase) + active1LotsGlobal;
+        let active1Lots = countActiveOffset1(activeOrders, roundedBase) + active1LotsGlobal;
         const needed1 = Math.max(0, 10 - active1Lots);
         const place1 = Math.min(Number(trade.quantity), needed1);
         const placeWide = Number(trade.quantity) - place1;
@@ -155,29 +168,32 @@ async function processTrade(order, figi) {
         }
         
         if (placeWide > 0) {
-            const each = Math.floor(placeWide / 10);
-            const extra = placeWide % 10;
-            for (let i = 0; i < 10; i++) {
-                const lots = each + (i < extra ? 1 : 0);
-                if (lots === 0) continue;
-                const offsetStep = 2 + i;
-                const wideDelta = priceDelta + 1 + i;
-                const widePrice = isBuy
-                    ? price + wideDelta
-                    : price - wideDelta;
-                const roundedWide = Math.round(widePrice * 1000) / 1000;
-                const oid = `w${offsetStep}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-                try {
-                    const r = await api.orders.postOrder({
-                        accountId, figi, instrumentId: figi,
-                        quantity: lots,
-                        price: api.helpers.toQuotation(roundedWide),
-                        direction: counterDirection,
-                        orderType: 1, timeInForce: 1, priceType: 1, orderId: oid,
-                    });
-                    console.log(`  => w${offsetStep} ${lots} @ ${roundedWide}: ${r.orderId}`);
-                } catch (e) {
-                    console.log(`  => Ошибка w${offsetStep}: ${e.message}`);
+            const wideCounts = getWideCounts(activeOrders);
+            const sorted = Object.entries(wideCounts).sort((a, b) => a[1] - b[1]);
+            let remain = placeWide;
+            while (remain > 0) {
+                for (const [step, count] of sorted) {
+                    if (remain === 0) break;
+                    const offsetStep = parseInt(step);
+                    const wideDelta = priceDelta + offsetStep - 1;
+                    const widePrice = isBuy
+                        ? price + wideDelta
+                        : price - wideDelta;
+                    const roundedWide = Math.round(widePrice * 1000) / 1000;
+                    const oid = `w${offsetStep}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+                    try {
+                        const r = await api.orders.postOrder({
+                            accountId, figi, instrumentId: figi,
+                            quantity: 1,
+                            price: api.helpers.toQuotation(roundedWide),
+                            direction: counterDirection,
+                            orderType: 1, timeInForce: 1, priceType: 1, orderId: oid,
+                        });
+                        console.log(`  => w${offsetStep} 1 @ ${roundedWide}: ${r.orderId}`);
+                    } catch (e) {
+                        console.log(`  => Ошибка w${offsetStep}: ${e.message}`);
+                    }
+                    remain--;
                 }
             }
         }
