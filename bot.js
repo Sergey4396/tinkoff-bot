@@ -52,7 +52,9 @@ function isAfterHours() {
 async function getActiveOrders(figi) {
     try {
         const res = await api.orders.getOrders({ accountId });
-        return (res.orders || []).filter(o => o.figi === figi);
+        const orders = (res.orders || []).filter(o => o.figi === figi || o.instrumentId === figi);
+        console.log(`  => Активных заявок по ${figi}: ${orders.length}`);
+        return orders;
     } catch (e) {
         console.log(`  => Ошибка getOrders: ${e.message}`);
         return [];
@@ -169,6 +171,7 @@ async function processTrade(order, figi) {
         
         if (placeWide > 0) {
             const wideCounts = getWideCounts(activeOrders);
+            console.log(`  => wide загруженность: ${JSON.stringify(wideCounts)}`);
             const sorted = Object.entries(wideCounts).sort((a, b) => a[1] - b[1]);
             let remain = placeWide;
             while (remain > 0) {
