@@ -156,7 +156,7 @@ async function processTrade(order, figi) {
         }
         
         let active1Lots = countAtPrice(roundedBase);
-        const needed1 = Math.max(0, 10 - active1Lots);
+        const needed1 = Math.max(0, 100 - active1Lots);
         const place1 = Math.min(Number(trade.quantity), needed1);
         const placeWide = Number(trade.quantity) - place1;
         
