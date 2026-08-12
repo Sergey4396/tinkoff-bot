@@ -8,6 +8,7 @@ const INSTRUMENTS = {
 'FSMLT0926000': 1, //SSU6
 'FWUSH0926000': 1, //WUU6
 'FNGM02270000': 0.030, //NRG7
+'FNGM01270000': 0.040, //NRF7
 //'FUTNGM072600': 0.010,  // NRN6
 //'FUTNGM082600': 0.010,  // NRQ6
 'FUTNGM052600': 0.012,  // NRK6
@@ -33,6 +34,8 @@ const INSTRUMENTS = {
 //Так ищем фиги
 //cd ~/tinkoff-bot && git pull
 //  node find_figi.js NRM6
+//а это ищем фиги в новом нашем режиме.
+//NODE_EXTRA_CA_CERTS=/root/tinkoff-bot/tinkoff_ca.pem node find_figi.js NRG7
 
 
 const api = new TinkoffInvestApi({ token: TOKEN });
