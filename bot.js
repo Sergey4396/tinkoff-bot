@@ -47,6 +47,38 @@ let lastActivity = Date.now();
 const processedTrades = new Set();
 const ourOrders = new Map(); // serverOrderId -> {price, lots, dir, figi}
 
+// Аномалия по NRG7 (FNGM02270000): если цена сделки отклонилась от базовой
+// (первой нашей сделки в текущем дне) более чем на SPIKE_THRESHOLD пунктов,
+// встречная заявка выставляется по базовой цене, а не по price +/- delta.
+const SPIKE_FIGI = 'FNGM02270000';
+const SPIKE_THRESHOLD = 0.070;
+const spikeBase = { price: null, dayKey: null };
+
+function mskDateKey() {
+    const now = new Date();
+    const h = (now.getUTCHours() + 3) % 24;
+    const d = new Date(now);
+    d.setUTCHours(d.getUTCHours() + 3);
+    if (h < 7) d.setUTCDate(d.getUTCDate() - 1);
+    return d.toISOString().slice(0, 10);
+}
+
+function getSpikeBase(figi) {
+    const key = mskDateKey();
+    if (figi === SPIKE_FIGI && spikeBase.dayKey === key && spikeBase.price !== null) {
+        return spikeBase.price;
+    }
+    return null;
+}
+
+function setSpikeBase(figi, price) {
+    const key = mskDateKey();
+    if (figi === SPIKE_FIGI) {
+        spikeBase.price = price;
+        spikeBase.dayKey = key;
+    }
+}
+
 function isAfterHours() {
     const now = new Date();
     const mskHour = (now.getUTCHours() + 3) % 24;
@@ -146,12 +178,28 @@ async function processTrade(order, figi) {
         
         const price = Number(trade.price.units) + Number(trade.price.nano) / 1000000000;
         console.log(`  Цена: ${price} Кол-во: ${trade.quantity}`);
-        
+
         const isBuy = order.direction === 1;
         const counterDirection = isBuy ? 2 : 1;
-        const basePrice = isBuy ? price + priceDelta : price - priceDelta;
-        const roundedBase = Math.round(basePrice * 1000) / 1000;
-        
+        let basePrice = isBuy ? price + priceDelta : price - priceDelta;
+        let roundedBase = Math.round(basePrice * 1000) / 1000;
+
+        if (figi === SPIKE_FIGI) {
+            const base = getSpikeBase(figi);
+            if (base === null) {
+                setSpikeBase(figi, price);
+                console.log(`  => SPIKE база установлена: ${price}`);
+            } else {
+                const dev = Math.abs(price - base);
+                console.log(`  => SPIKE база: ${base}, dev: ${dev.toFixed(3)}`);
+                if (dev > SPIKE_THRESHOLD) {
+                    roundedBase = Math.round(base * 1000) / 1000;
+                    basePrice = base;
+                    console.log(`  => Аномалия! встречная по базе: ${basePrice}`);
+                }
+            }
+        }
+
         const useWideDist = figi === 'FSMLT0926000' || figi === 'FWUSH0926000';
         
         if (!useWideDist) {
