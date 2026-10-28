@@ -4,7 +4,7 @@ const TOKEN = 't.KNbRWnr_MoKUOuBfzvjyUTUYftgAdZhpZ4zBqfwkgYtd4wnOaYuHCJHAeRXounc
 
 const INSTRUMENTS = {
 
-'FUTSILVM0926': 0.25, // S1U6 серебро мини сентябрь
+'FUTSILVM1226': 0.25, // S1Z6 серебро мини декабрь
 'FSMLT0926000': 1, //SSU6
 'FSMLT1226000': 1, //SSZ6
 'FWUSH0926000': 1, //WUU6
