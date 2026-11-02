@@ -153,13 +153,13 @@ async function processTrade(order, figi) {
     const priceDelta = INSTRUMENTS[figi];
     console.log(`\n=== СДЕЛКА === ${figi} direction: ${order.direction}`);
     
-    if (isAfterHours()) {
-        const now = new Date();
-        const h = (now.getUTCHours() + 3) % 24;
-        const m = String(now.getUTCMinutes()).padStart(2, '0');
-        console.log(`  => Пропущен: до 07:01 МСК (сейчас ${h}:${m})`);
-        return;
-    }
+//    if (isAfterHours()) {
+//        const now = new Date();
+//        const h = (now.getUTCHours() + 3) % 24;
+//        const m = String(now.getUTCMinutes()).padStart(2, '0');
+//        console.log(`  => Пропущен: до 07:01 МСК (сейчас ${h}:${m})`);
+//        return;
+//    }
     
     await getActiveOrders(figi);
     
